@@ -9,86 +9,76 @@
 
 int main()
 {
-    printf("Write 'q' to quit the shell\n");
+    printf("Write 'exit' to quit the shell\n");
     while (1)
     {
-        char *tempPtr, *newLinePtr, *ampersandPtr;
-        int i=0;// iterator
-        int r=0,k;//return value of execvp()
-        int j;//second iterator
-        int m; //iterator for spaces
-        int f=0;//flag
-        pid_t ChildID;//first child
+        char *tempPtr, *newLinePtr;
+        int i=0; // iterator
+        int r=0,k; //return value of execvp()
+        int j; //second iterator
         pid_t backgroundProcessID; //grandChild for background
-        char  line[MAX] ;//scaned input
-        char *cmd[MAX];//pointer array
-
-        ChildID = fork();
-
-        if (ChildID >=0)//fork sucess
+        char  line[MAX] ; //scaned input
+        char *cmd[MAX]; //pointer array, points to command tokens
+        printf("Shell > ");
+        fgets(line,MAX,stdin);//scanning
+        if (strlen(line)>512)
         {
-            if (ChildID==0) //Child
+            printf("Error : Your command must be 512 letters at most\n");
+            fprintf(stderr, "Error : Command must be 512 letters at most\n");
+        }
+        else
+        {
+            for (k = strlen(line) - 1; k >= 0; k--) // Determining the true end of the command (in case of empty spaces at the end of the string"
             {
-                printf("Shell > ");
-                fgets(line,MAX,stdin);//scanning
-
-                if (strlen(line)>512)
-                {
-                    printf("Error : Your command must be 512 letters at most\n");
-                    fprintf(stderr, "Error : Command must be 512 letters at most\n");
-                }
+                if(line[k] == ' ' || line[k] == '\n')
+                    continue;
                 else
+                    break;
+            }
+            if (k == -1)
+                continue; //Empty command, scan again
+
+            tempPtr = strtok(line," \n"); //Getting first token
+            while (tempPtr != NULL) //Looping on all tokens
+            {
+                cmd[i] = tempPtr; //Saving a pointer to the ith token
+                tempPtr = strtok(NULL," \n"); //Getting a pointer for the next token
+                i++;
+            }
+            cmd[i] = NULL; //Last token, terminator
+
+            for (j = 0; j < i; j++) //replacing new line character with a null terminator
+            {
+                if ( (newLinePtr = strchr(cmd[j], '\n')) != NULL)
                 {
-                    for (k = strlen(line); k > 0; k--)
-                    {
-                        if(line[k] == ' ' || line[k] == '\n') continue;
-                        else break;
-                    }
-                    if (k == 0) continue; //User only pressed "Enter"
+                    *newLinePtr = '\0';
+                }
+            }
 
-                    tempPtr = strtok(line," \n");
-                    while (tempPtr != NULL)
-                    {
-                        cmd[i] = tempPtr;
-                        tempPtr = strtok(NULL," \n");
-                        i++;
-                    }
-                    cmd[i] = NULL;
+            if (strcmp(cmd[0],"exit")==0)
+                kill(0,SIGKILL);
 
-                    for (j = 0; j < i; j++)
+            if (strcmp(cmd[i-1],"&")==0) //background
+            {
+                backgroundProcessID = fork();
+                if (backgroundProcessID >= 0) //grandChild sucess
+                {
+                    if (backgroundProcessID == 0) //grandChild
                     {
-                        if ( (newLinePtr = strchr(cmd[j], '\n')) != NULL)
-                        {
-                            *newLinePtr = '\0';
-                        }
-                    }
-
-                    if (strcmp(cmd[0],"q")==0) kill(0,SIGKILL);
-
-                    if (strcmp(cmd[i-1],"&")==0) //background
-                    {
-                        *cmd[i-1]='\0';
-                        backgroundProcessID = fork();
-                        if (backgroundProcessID >= 0) //grandChild sucess
-                        {
-                            if (backgroundProcessID == 0) //grandChild
-                            {
-                                if (strcmp(cmd[0],"cd")==0) chdir(cmd[1]);
-                                else r = execvp(cmd[0],cmd);
-                            }
-                            else break;
-                        }
-                    }
-                    else //foreground
-                    {
-                        if (strcmp(cmd[0],"cd")==0) chdir(cmd[1]);
-                        else r = execvp(cmd[0],cmd);
+                        //Executing command
+                        printf("Spawned child (%d)\n", backgroundProcessID);
+                        system(line);
                     }
                 }
             }
-            else wait(NULL);
+            else //foreground
+            {
+                //Executing command
+                system(line);
+            }
         }
-        if (r!=0) perror("Error ");
+        if (r!=0)
+            perror("Error ");
     }
     return 0;
 }
